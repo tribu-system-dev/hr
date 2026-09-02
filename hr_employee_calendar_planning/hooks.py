@@ -58,4 +58,10 @@ def post_init_hook(env, employees=None):
         employee.copy_global_leaves()
         # Now the automatic calendar has been created, so we link the
         # leaves to that one so they count correctly.
-        leaves.write({"calendar_id": employee.resource_calendar_id.id})
+        # NOTE v19: the write() above regenerates work entries, which can
+        # delete some of the conflicting resource.calendar.leaves computed
+        # in `leaves` above as a side effect (found live via a fresh
+        # install: raised MissingError: Record does not exist or has been
+        # deleted for a leave id no longer in the DB) - re-check existence
+        # right before writing instead of trusting the stale recordset.
+        leaves.exists().write({"calendar_id": employee.resource_calendar_id.id})
