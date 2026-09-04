@@ -144,7 +144,19 @@ class HrEmployee(models.Model):
     ):
         # Override function that change the calendar depending on date
         if len(self) == 1 and self.calendar_ids:
-            from_dt_tz = fields.Datetime.context_timestamp(self, from_datetime)
+            # NOTE v19: hr.version._generate_work_entries_postprocess()
+            # (odoo/addons/hr_work_entry/models/hr_version.py) now calls
+            # this with an already tz-aware from_datetime (it does its own
+            # .astimezone(tz) on the same value right after) - passing that
+            # into fields.Datetime.context_timestamp() raised ValueError:
+            # Not naive datetime (tzinfo is already set), since that helper
+            # still expects a naive UTC value. Found live via a fresh
+            # install of hr_employee_calendar_planning (crashes as soon as
+            # an employee's calendar/leave triggers work entry generation).
+            if from_datetime.tzinfo is not None:
+                from_dt_tz = from_datetime.astimezone(self.env.tz)
+            else:
+                from_dt_tz = fields.Datetime.context_timestamp(self, from_datetime)
             check_date = from_dt_tz.date()
             planned_line = self._get_planning_calendars(check_date, check_date)
             if planned_line:
